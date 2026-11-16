@@ -14,8 +14,8 @@ jede ist eine Stimme: Die Wellen bestimmen die Noten, du steuerst das Wetter.
   und singt auf K3 mit Echo
 - **Lea**, der Vogel, erscheint nur, solange du K2 hältst: ein gleitendes
   Legato-Solo
-- **Sean** ist das Meer selbst: Tempo, Skala, Grundton, Filter, zufällige
-  Gezeiten, Bitcrusher und ein Tape-Ausgang
+- **Sean** ist das Meer selbst: Skala, Grundton und ein Filter, den sich alle
+  Stimmen teilen
 - jede Stimme spielt ein **Arpeggio**, das der Welle folgt, oder einen
   **generativen** Gang durch die Skala; eine Figur seitlich zu bewegen
   transponiert sie
@@ -61,7 +61,7 @@ Jede Taste und jeder Encoder überspringt das Intro.
 | E3 | Mobba nach links / rechts (dasselbe für sie) |
 | K2 halten | Lea fliegt herein und spielt ein Solo; E2 bewegt sie; beim Loslassen fliegt sie langsam davon |
 | K3 | Mobba singt eine Note nahe ihrer Position, und eine halbe Sekunde später gibt das Meer sie als Echo zurück, eine Quinte tiefer |
-| K1 halten | öffnet das Panel der gewählten Figur (siehe unten) |
+| K1 halten | öffnet das Panel (siehe unten) |
 
 ![hohe Wellen](docs/2_waves.png)
 
@@ -69,40 +69,35 @@ Jede Taste und jeder Encoder überspringt das Intro.
 
 ![Mobba singt](docs/4_mobba_sings.png)
 
-### Panels (K1 halten)
+### Panel (K1 halten)
 
-Solange K1 gehalten wird, zoomt die Szene auf eine Figur und ein Panel
-gleitet herein.
+Solange K1 gehalten wird, fährt ein einziges Panel herein: eine Liste mit
+sechs Einstellungen.
 
-| Bedienelement | Funktion |
+| Regler | Aktion |
 |---|---|
-| E1 | Figur wählen: Tucker, Mobba, Sean |
-| E2 | Eintrag wählen |
-| E3 | ihn ändern |
+| E2 | Einstellung wählen |
+| E3 | ändern |
 
-![Tucker](docs/5_tucker.png)
+E1 bleibt auch bei offenem Panel der Wind.
 
-**Tucker** — on/off · Modus (arp / gen) · Synth (LFSaw, FM Bell, LFGauss,
-Dream) · tail (Notenlänge, nur im Arp-Modus) · legato.
+| Einstellung | Werte |
+|---|---|
+| tucker | off / Dream / Bell / Gauss (seine Stimme) |
+| mobba | off / on |
+| modo | arp / gen, für beide |
+| escala | Dur, Moll-Varianten, Modi, Pentatoniken, Ganzton, Blues, Zigeunermoll |
+| root | C … B |
+| filter | 100–5000 Hz |
 
-![Mobba](docs/6_mobba.png)
-
-**Mobba** — on/off · Modus (arp / gen) · Synth (Pulse, Saw, SinOsc) · tail.
-
-![Sean](docs/7_sean.png)
-
-**Sean** — tempo · sync (Clock-Quelle) · speed (×1/4 … ×4) · filter ·
-random (Gezeiten, die von selbst schneller und langsamer werden) · root ·
-Skala (Dur, Moll-Varianten, Modi, Pentatonik, Ganzton, Blues, Zigeunermoll) ·
-fx (keiner / Bitcrusher, mit bits und rate) · out mode (normal / tape, mit
-amount).
+Tempo und Clock-Quelle sind die von norns (PARAMETERS > CLOCK).
 
 ### Speichern
 
-Alles aus den Panels steht auch unter PARAMETERS > MAR, lässt sich also per
-MIDI steuern und in PSETs speichern. Beim Verlassen des Skripts wird der
-aktuelle Zustand in `~/dust/data/umi/mar_estado.pset` gespeichert und beim
-nächsten Mal wiederhergestellt.
+Die sechs Einstellungen stehen auch unter PARAMETERS > UMI, lassen sich also
+per MIDI zuweisen und als PSET speichern. Beim Beenden wird der aktuelle
+Zustand in `~/dust/data/umi/umi_estado.pset` geschrieben und beim nächsten
+Start wiederhergestellt.
 
 <!-- u-ma:more -->
 **Mehr von U-MA:** alle Instrumente und Werkzeuge an einem Ort → [U-MA-Übersicht](https://github.com/buenosairesfront/U-ma/blob/main/README.de.md)

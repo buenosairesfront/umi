@@ -14,8 +14,8 @@ chacun est une voix : les vagues choisissent les notes, vous pilotez la météo.
   chante avec un écho sur K3
 - **Lea**, l'oiseau, n'apparaît que tant que vous maintenez K2 : un solo
   legato qui plane
-- **Sean**, c'est la mer elle-même : tempo, gamme, tonique, filtre, marée
-  aléatoire, bit crusher et sortie bande
+- **Sean**, c'est la mer elle-même : gamme, tonique et un filtre partagé par
+  toutes les voix
 - chaque voix joue un **arpège** qui suit la vague ou une promenade
   **générative** dans la gamme ; déplacer un personnage sur le côté le transpose
 - la houle fixe le nombre de pas : mer calme = 2 notes, grosses vagues = 16
@@ -59,7 +59,7 @@ N'importe quelle touche ou encodeur passe l'intro.
 | E3 | déplace Mobba à gauche / à droite (pareil, pour elle) |
 | K2 maintenu | Lea arrive en volant et joue un solo ; E2 la déplace ; au relâchement elle repart lentement |
 | K3 | Mobba chante une note proche de sa position, et une demi-seconde plus tard la mer la renvoie en écho, une quinte plus bas |
-| K1 maintenu | ouvre le panneau du personnage choisi (voir plus bas) |
+| K1 maintenu | ouvre le panneau (voir plus bas) |
 
 ![grosses vagues](docs/2_waves.png)
 
@@ -67,40 +67,34 @@ N'importe quelle touche ou encodeur passe l'intro.
 
 ![Mobba chante](docs/4_mobba_sings.png)
 
-### Panneaux (K1 maintenu)
+### Panneau (K1 maintenu)
 
-Tant que K1 est maintenu, la scène zoome sur un personnage et un panneau glisse
-à l'écran.
+Tant que K1 est maintenu, un seul panneau glisse à l'écran : une liste de six
+réglages.
 
 | commande | action |
 |---|---|
-| E1 | choisir le personnage : Tucker, Mobba, Sean |
-| E2 | choisir un élément |
+| E2 | choisir un réglage |
 | E3 | le modifier |
 
-![Tucker](docs/5_tucker.png)
+E1 reste le vent quand le panneau est ouvert.
 
-**Tucker** — on/off · mode (arp / gen) · synth (LFSaw, FM Bell, LFGauss,
-Dream) · tail (durée des notes, en mode arp seulement) · legato.
+| réglage | valeurs |
+|---|---|
+| tucker | off / Dream / Bell / Gauss (sa voix) |
+| mobba | off / on |
+| mode | arp / gen, pour les deux |
+| gamme | majeure, mineures, modes, pentatoniques, par tons, blues, mineure tzigane |
+| root | C … B |
+| filter | 100–5000 Hz |
 
-![Mobba](docs/6_mobba.png)
-
-**Mobba** — on/off · mode (arp / gen) · synth (Pulse, Saw, SinOsc) · tail.
-
-![Sean](docs/7_sean.png)
-
-**Sean** — tempo · sync (source d'horloge) · speed (×1/4 … ×4) · filter ·
-random (une marée qui accélère et ralentit d'elle-même) · root · gamme
-(majeure, mineures, modes, pentatoniques, tons entiers, blues, mineure
-tzigane) · fx (aucun / bit crusher, avec bits et rate) · out mode (normal /
-tape, avec amount).
+Le tempo et la source d'horloge sont ceux de norns (PARAMETERS > CLOCK).
 
 ### Sauvegarde
 
-Tout ce qui est dans les panneaux se trouve aussi dans PARAMETERS > MAR : on
-peut l'assigner en MIDI et le sauvegarder dans les PSET. En quittant le
-script, l'état courant est enregistré dans `~/dust/data/umi/mar_estado.pset`
-et revient la fois suivante.
+Les six réglages sont aussi dans PARAMETERS > UMI : ils peuvent être assignés
+en MIDI et enregistrés dans un PSET. En quittant le script, l'état courant est
+écrit dans `~/dust/data/umi/umi_estado.pset` et revient la fois suivante.
 
 <!-- u-ma:more -->
 **Plus de U-MA :** tous les instruments et outils au même endroit → [vitrine U-MA](https://github.com/buenosairesfront/U-ma/blob/main/README.fr.md)

@@ -13,8 +13,7 @@ one is a voice: the waves decide the notes, and you steer the weather.
 - **Mobba**, the whale, swims below with her own slower line and sings back
   with an echo on K3
 - **Lea**, the bird, only appears while you hold K2: a gliding legato solo
-- **Sean** is the sea itself: tempo, scale, root, filter, a random tide,
-  bit crusher and a tape output
+- **Sean** is the sea itself: scale, root and one filter shared by every voice
 - each voice plays an **arpeggio** that follows the wave or a **generative**
   walk through the scale; moving a character sideways transposes it
 - the swell sets the number of steps: calm sea = 2 notes, big waves = 16
@@ -57,7 +56,7 @@ Any key or encoder skips the intro.
 | E3 | move Mobba left / right (same, for her) |
 | K2 held | Lea flies in and plays a solo; E2 moves her; let go and she leaves slowly |
 | K3 | Mobba sings a note near where she is, and half a second later the sea returns it as an echo, a fifth lower |
-| K1 held | opens the panel of the selected character (see below) |
+| K1 held | opens the panel (see below) |
 
 ![big waves](docs/2_waves.png)
 
@@ -65,38 +64,33 @@ Any key or encoder skips the intro.
 
 ![Mobba sings](docs/4_mobba_sings.png)
 
-### Panels (K1 held)
+### Panel (K1 held)
 
-While K1 is held the scene zooms on one character and a panel slides in.
+While K1 is held a single panel slides in: one list of six settings.
 
 | control | action |
 |---|---|
-| E1 | choose character: Tucker, Mobba, Sean |
-| E2 | select item |
+| E2 | choose a setting |
 | E3 | change it |
 
-![Tucker](docs/5_tucker.png)
+E1 is still the wind while the panel is open.
 
-**Tucker** — on/off · mode (arp / gen) · synth (LFSaw, FM Bell, LFGauss,
-Dream) · tail (note length, arp mode only) · legato.
+| setting | values |
+|---|---|
+| tucker | off / Dream / Bell / Gauss (his voice) |
+| mobba | off / on |
+| mode | arp / gen, for both |
+| scale | major, minors, modes, pentatonics, whole tone, blues, gypsy minor |
+| root | C … B |
+| filter | 100–5000 Hz |
 
-![Mobba](docs/6_mobba.png)
-
-**Mobba** — on/off · mode (arp / gen) · synth (Pulse, Saw, SinOsc) · tail.
-
-![Sean](docs/7_sean.png)
-
-**Sean** — tempo · sync (clock source) · speed (×1/4 … ×4) · filter ·
-random (a tide that speeds up and slows down by itself) · root · scale
-(major, minors, modes, pentatonics, whole tone, blues, gypsy minor) ·
-fx (none / bit crusher, with bits and rate) · out mode (normal / tape, with
-amount).
+Tempo and clock source are the norns ones (PARAMETERS > CLOCK).
 
 ### Saving
 
-Everything in the panels is also in PARAMETERS > MAR, so it can be mapped
-to MIDI and saved in PSETs. When you leave the script the current state is
-stored in `~/dust/data/umi/mar_estado.pset` and comes back next time.
+The six settings are also in PARAMETERS > UMI, so they can be MIDI-mapped
+and saved in a PSET. On exit the current state is written to
+`~/dust/data/umi/umi_estado.pset` and comes back next time.
 
 <!-- u-ma:more -->
 **More from U-MA:** every instrument and tool in one place → [U-MA showcase](https://github.com/buenosairesfront/U-ma)

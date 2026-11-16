@@ -1,38 +1,26 @@
--- umi v7.6 (antes Mar Sintetizador)
+-- umi v8.0 (antes Mar Sintetizador) — versión simple
 -- Personajes: Tucker (barco), Mobba (ballena), Lea (ave, solo por K2), Sean (el mar)
 --
--- Al arrancar: la intro U-MA de partículas (la de uma_splash/splash) y
--- después la pantalla "UMI"; luego arranca el instrumento. Cualquier
--- tecla o encoder las saltea.
+-- Al arrancar: la intro U-MA de partículas y después la pantalla "UMI";
+-- luego arranca el instrumento. Cualquier tecla o encoder las saltea.
 --
--- Estado base (K1 sin apretar):
---   E1: Viento & Velocidad (también gobierna la cantidad de pasos del
---       arpegio/generativo de todos: mar calmo = 2, olas grandes = 16)
---   E2: Mueve a Tucker en X (transpone su arpegio/generativo -8..+8
---       pasos de escala) — o mueve a Lea en X mientras K2 está apretado
---   E3: Mueve a Mobba en X (mismo efecto de transposición que Tucker)
--- K1 (mantenido): abre el panel de quien esté elegido con E1 (Tucker /
---     Mobba / Sean). E2 navega ítems y E3 los modifica (si el solo de
---     Lea está activo, E2 sigue siendo de ella).
---     Tucker/Mobba: on/off, modo, synth, tail (solo en arp). El synth
---     "Dream" de Tucker es el barco del primer Mar. Tucker
---     además tiene "legato". Sean: tempo, sync, speed, filter, random
---     (la marea aleatoria), root, escala, fx (No/Bit Crusher), out mode
---     (Normal/Tape) — "fx" y "out mode" revelan sus propios parámetros
---     debajo solo cuando corresponde.
--- K2 (mantenido): Lea entra volando despacio desde la izquierda, voz
---     Blip sostenida propia, generativo de 12 pasos con legato; al
---     soltar sale despacio por la derecha (fade out de 3s). Si se
---     vuelve a apretar mientras sale, da la vuelta desde donde está.
--- K3: Mobba canta una nota cerca de su registro actual; medio segundo
---     después vuelve como eco, una quinta más grave y apagada.
+-- E1: Viento (también la cantidad de pasos del arpegio/generativo:
+--     mar calmo = 2, olas grandes = 16)
+-- E2: Mueve a Tucker en X (transpone -8..+8 pasos de escala) — o mueve
+--     a Lea mientras su solo está activo
+-- E3: Mueve a Mobba en X (mismo efecto de transposición)
+-- K1 (mantenido): abre el panel, una sola lista de 6 ajustes. E2 elige
+--     y E3 cambia: tucker (off/Dream/Bell/Gauss), mobba (off/on), modo
+--     (arp/gen, para los dos), escala, root, filter.
+-- K2 (mantenido): Lea entra volando desde la izquierda, voz Blip
+--     sostenida, generativo de 12 pasos; al soltar sale por la derecha.
+-- K3: Mobba canta una nota; un instante después vuelve como eco, una
+--     quinta más grave y apagada.
 --
--- Tiempo: la música corre en su propio reloj (clock de norns, ~100 Hz),
--- separada de la pantalla (30 fps). Tempo y sincronización son los del
--- sistema (PARAMETERS > CLOCK: internal / midi / link / crow).
--- Todos los ajustes de los paneles son parámetros (menú PARAMETERS >
--- MAR): se pueden mapear a MIDI, guardar en PSET, y el último estado se
--- recuerda solo al salir del script.
+-- Tempo y sincronización: los del sistema (PARAMETERS > CLOCK).
+-- Los 6 ajustes del panel son parámetros (PARAMETERS > UMI): se pueden
+-- mapear a MIDI, guardar en PSET, y el último estado se recuerda solo.
+-- La versión completa anterior quedó en umi_v7.6_respaldo.lua.
 
 engine.name = "Mar"
 
@@ -104,66 +92,24 @@ local wind_speed = 1.0 -- gobierna la intensidad visual del mar/viento, no la ve
 local clock_counter = 0
 local parallax_offset = 0
 
-local random_tide = false
-local tide_rate = 1.0
-local tide_rate_target = 1.0
-local tide_target_timer = 0
-
 local current_tempo_mult = 1.0
 
 -- ============================================================
--- TEMPO (página Sean): reloj global de norns
+-- TEMPO: reloj global de norns (PARAMETERS > CLOCK)
 -- ============================================================
--- El pulso viene de clock (internal/midi/link/crow, según PARAMETERS >
--- CLOCK). "speed" multiplica la velocidad del mar respecto de ese pulso.
-local speed_options = {"x1/4", "x1/2", "x1", "x2", "x4"}
-local speed_values = {0.25, 0.5, 1, 2, 4}
-local speed_idx = 3
-
--- A 120 bpm y speed x1 el mar avanza 0.75 de fase por pulso (igual que
--- la versión anterior a 30 fps).
+-- A 120 bpm el mar avanza 0.75 de fase por pulso.
 local SEA_PHASE_PER_BEAT = 0.75
 
 function get_tempo_mult()
-  return (clock.get_tempo() / 120) * speed_values[speed_idx]
+  return clock.get_tempo() / 120
 end
 
--- ============================================================
--- PARÁMETROS DE AUDIO GLOBAL (página Sean)
--- ============================================================
 local filter_cutoff = 3000 -- Hz, compartido por los 3 filtros de personaje (tope 5000)
 
--- fx: efecto de inserción (procesa antes que out mode)
-local fx_options = {"No", "Bit Crusher"}
-local fx_idx = 1
-local crush_bits = 16         -- 1-16 (16 = sin reducción de bits)
-local crush_rate_level = 20   -- 1-20 (20 = sin reducción de sample rate)
-
--- out mode: carácter final de salida (procesa después de fx)
-local out_mode_options = {"Normal", "Tape"}
-local out_mode_idx = 1
-local fx_amount = 0.3 -- 0-1, intensidad de Tape cuando corresponde
-
-local function explin(x, in_min, in_max, out_min, out_max)
-  local ratio = out_max / out_min
-  local pos = (x - in_min) / (in_max - in_min)
-  return out_min * (ratio ^ pos)
-end
-
-local function crush_rate_hz()
-  return explin(crush_rate_level, 1, 20, 800, 48000)
-end
-
 -- ============================================================
--- SELECCIÓN DE PERSONAJE Y PANEL (K1)
+-- PANEL (K1)
 -- ============================================================
 local entity_order = {"boat", "whale"}
-
--- char_order incluye "sean", que no es una entidad real (no está en la
--- tabla entities) — se maneja aparte en todo lo que sigue.
-local char_order = {"boat", "whale", "sean"}
-local char_labels = {boat = "TUCKER", whale = "MOBBA", sean = "SEAN"}
-local selected_char_idx = 1
 
 local zoom_held = false -- true mientras K1 está mantenido
 local menu_slide = 0    -- 0 = panel oculto, 1 = panel totalmente desplegado
@@ -179,61 +125,34 @@ local entities = {
     phase = 0, y_pos = 36, x_pos = 64, x_target = 64, pulse = 0,
     prev_note = -1, prev_step = -1,
     on = true, mode = "arp", steps = 16, max_steps = 16,
-    synth_idx = 1, synth_names = {"LFSaw", "FM Bell", "LFGauss", "Dream"},
+    synth_idx = 1, synth_names = {"Dream", "Bell", "Gauss"},
     default_release = 0.4,
     walk_note_idx = 1, walk_dir = 1, walk_phrase_len = 4, gen_wait = 0,
-    legato = false, legato_voice = false, last_idx = nil
+    last_idx = nil
   },
   whale = {
     phase = 2.0, y_pos = 50, x_pos = 64, x_target = 64, swim_phase = 0,
     prev_note = -1, prev_step = -1,
     on = true, mode = "arp", steps = 8, max_steps = 8,
-    synth_idx = 1, synth_names = {"Pulse", "Saw", "SinOsc"},
     default_release = 0.8,
     walk_note_idx = 1, walk_dir = 1, walk_phrase_len = 4, gen_wait = 0,
     last_idx = nil
   }
 }
 
--- Tucker tiene un ítem "legato" extra; Mobba no. "tail" solo
--- aparece cuando el modo de esa entidad está en "arp" (en "gen" la
--- duración de nota ya es aleatoria por su cuenta, tail no aplicaría).
--- "steps" ya no es un ítem editable: lo gobierna el oleaje (ver
--- wave_steps más abajo), como parte de E3 en la página Mar.
-function build_entity_items(entity_name)
-  local entity = entities[entity_name]
-  local items = {}
-  table.insert(items, {kind = "on_off", label = "on/off"})
-  table.insert(items, {kind = "mode", label = "modo"})
-  table.insert(items, {kind = "synth", label = "synth"})
-  if entity.mode == "arp" then
-    table.insert(items, {kind = "tail", label = "tail"})
-  end
-  if entity_name == "boat" then
-    table.insert(items, {kind = "legato", label = "legato"})
-  end
-  return items
-end
-
-function entity_item_value(entity, kind)
-  if kind == "on_off" then
-    return entity.on and "ON" or "OFF"
-  elseif kind == "mode" then
-    return entity.mode
-  elseif kind == "synth" then
-    return entity.synth_names[entity.synth_idx]
-  elseif kind == "tail" then
-    return string.format("%.2fs", entity.default_release)
-  elseif kind == "legato" then
-    return entity.legato and "ON" or "OFF"
-  end
-  return ""
-end
+-- El panel: una sola lista fija. Cada ítem es un parámetro (id).
+local panel_items = {
+  {id = "tucker", label = "tucker"},
+  {id = "mobba", label = "mobba"},
+  {id = "modo", label = "modo"},
+  {id = "sea_scale", label = "escala"},
+  {id = "sea_root", label = "root"},
+  {id = "sea_filter", label = "filter"},
+}
 
 -- Cantidad de pasos del arpegio/generativo, derivada del oleaje actual
--- (que E3 controla en la página Mar vía wind_speed): mar calmo = 2
--- notas, mar con olas grandes/empinadas = hasta 16, acotado al tope
--- propio de cada personaje (Mobba nunca pasa de 8, por ejemplo).
+-- (E1, vía wind_speed): mar calmo = 2 notas, olas grandes = hasta 16,
+-- acotado al tope propio de cada personaje (Mobba nunca pasa de 8).
 local WIND_SPEED_MIN, WIND_SPEED_MAX = 0.5, 3.0
 local function wave_steps(max_steps)
   local norm = util.clamp((wind_speed - WIND_SPEED_MIN) / (WIND_SPEED_MAX - WIND_SPEED_MIN), 0, 1)
@@ -328,88 +247,38 @@ local STATE_FILE = nil -- se arma en init (carpeta data del script)
 local music_clock_id = nil
 
 local function add_mar_params()
-  params:add_group("MAR", 19)
+  params:add_group("UMI", 6)
 
-  params:add_separator("Tucker")
-  params:add_option("tucker_on", "tucker on/off", {"OFF", "ON"}, 2)
-  params:set_action("tucker_on", function(v)
-    entities.boat.on = (v == 2)
-    refresh_boat_voice(false)
+  local tucker_opts = {"OFF"}
+  for _, name in ipairs(entities.boat.synth_names) do table.insert(tucker_opts, name) end
+  params:add_option("tucker", "tucker", tucker_opts, 2)
+  params:set_action("tucker", function(v)
+    entities.boat.on = (v > 1)
+    if v > 1 then entities.boat.synth_idx = v - 1 end
   end)
-  params:add_option("tucker_mode", "tucker modo", {"arp", "gen"}, 1)
-  params:set_action("tucker_mode", function(v) entities.boat.mode = (v == 1) and "arp" or "gen" end)
-  params:add_option("tucker_synth", "tucker synth", entities.boat.synth_names, 1)
-  params:set_action("tucker_synth", function(v)
-    local changed = entities.boat.synth_idx ~= v
-    entities.boat.synth_idx = v
-    if changed and entities.boat.legato_voice then refresh_boat_voice(true) end
-  end)
-  params:add_control("tucker_tail", "tucker tail", controlspec.new(0.02, 3.0, "lin", 0.01, 0.4, "s"))
-  params:set_action("tucker_tail", function(v)
-    entities.boat.default_release = v
-    if entities.boat.legato_voice then engine.boat_legato_release(v) end
-  end)
-  params:add_option("tucker_legato", "tucker legato", {"OFF", "ON"}, 1)
-  params:set_action("tucker_legato", function(v)
-    entities.boat.legato = (v == 2)
-    refresh_boat_voice(false)
-  end)
-
-  params:add_separator("Mobba")
-  params:add_option("mobba_on", "mobba on/off", {"OFF", "ON"}, 2)
-  params:set_action("mobba_on", function(v) entities.whale.on = (v == 2) end)
-  params:add_option("mobba_mode", "mobba modo", {"arp", "gen"}, 1)
-  params:set_action("mobba_mode", function(v) entities.whale.mode = (v == 1) and "arp" or "gen" end)
-  params:add_option("mobba_synth", "mobba synth", entities.whale.synth_names, 1)
-  params:set_action("mobba_synth", function(v) entities.whale.synth_idx = v end)
-  params:add_control("mobba_tail", "mobba tail", controlspec.new(0.02, 3.0, "lin", 0.01, 0.8, "s"))
-  params:set_action("mobba_tail", function(v) entities.whale.default_release = v end)
-
-  params:add_separator("Sean")
-  params:add_option("sea_speed", "speed", speed_options, 3)
-  params:set_action("sea_speed", function(v) speed_idx = v end)
-  params:add_control("sea_filter", "filter", controlspec.new(100, 5000, "exp", 1, 3000, "Hz"))
-  params:set_action("sea_filter", function(v)
-    filter_cutoff = v
-    engine.set_filter_cutoff(v)
-  end)
-  params:add_option("sea_random", "random (marea)", {"OFF", "ON"}, 1)
-  params:set_action("sea_random", function(v) random_tide = (v == 2) end)
-  params:add_option("sea_root", "root", root_note_names, 1)
-  params:set_action("sea_root", function(v)
-    root_pc = v - 1
-    root_note = ROOT_OCTAVE_BASE + root_pc
-    build_scale()
+  params:add_option("mobba", "mobba", {"OFF", "ON"}, 2)
+  params:set_action("mobba", function(v) entities.whale.on = (v == 2) end)
+  params:add_option("modo", "modo", {"arp", "gen"}, 1)
+  params:set_action("modo", function(v)
+    local mode = (v == 1) and "arp" or "gen"
+    entities.boat.mode = mode
+    entities.whale.mode = mode
   end)
   params:add_option("sea_scale", "escala", scale_names, 2)
   params:set_action("sea_scale", function(v)
     current_scale = v
     build_scale()
   end)
-  params:add_option("sea_fx", "fx", fx_options, 1)
-  params:set_action("sea_fx", function(v)
-    fx_idx = v
-    engine.set_fx_type(v)
+  params:add_option("sea_root", "root", root_note_names, 1)
+  params:set_action("sea_root", function(v)
+    root_pc = v - 1
+    root_note = ROOT_OCTAVE_BASE + root_pc
+    build_scale()
   end)
-  params:add_number("sea_bits", "crush bits", 1, 16, 16)
-  params:set_action("sea_bits", function(v)
-    crush_bits = v
-    engine.set_crush(crush_bits, crush_rate_hz())
-  end)
-  params:add_number("sea_rate", "crush rate", 1, 20, 20)
-  params:set_action("sea_rate", function(v)
-    crush_rate_level = v
-    engine.set_crush(crush_bits, crush_rate_hz())
-  end)
-  params:add_option("sea_out", "out mode", out_mode_options, 1)
-  params:set_action("sea_out", function(v)
-    out_mode_idx = v
-    engine.set_out_mode(v)
-  end)
-  params:add_control("sea_amount", "tape amount", controlspec.new(0, 1, "lin", 0.01, 0.3, ""))
-  params:set_action("sea_amount", function(v)
-    fx_amount = v
-    engine.set_fx_amount(v)
+  params:add_control("sea_filter", "filter", controlspec.new(100, 5000, "exp", 1, 3000, "Hz"))
+  params:set_action("sea_filter", function(v)
+    filter_cutoff = v
+    engine.set_filter_cutoff(v)
   end)
 end
 
@@ -442,7 +311,7 @@ function init()
   end
 
   add_mar_params()
-  STATE_FILE = norns.state.data .. "mar_estado.pset"
+  STATE_FILE = norns.state.data .. "umi_estado.pset"
   if util.file_exists(STATE_FILE) then
     params:read(STATE_FILE)
   end
@@ -518,38 +387,8 @@ function next_harmonic_index(entity, headroom)
 end
 
 -- ============================================================
--- DISPARO DE SONIDO UNIFICADO (arp y gen llegan acá). Si la entidad
--- tiene legato activo (solo Tucker y Lea pueden), en vez de disparar
--- una nota nueva se actualiza la frecuencia de la voz persistente que
--- ya está sonando, con portamento real (glide) del lado del engine.
+-- DISPARO DE SONIDO UNIFICADO (arp y gen llegan acá)
 -- ============================================================
--- Voz sostenida de legato de Tucker: solo existe mientras Tucker está
--- encendido, con legato, y no está en un silencio del generativo. Antes
--- de crearla se fija la frecuencia, así arranca en la nota correcta.
-function boat_legato_voice(active, note)
-  local e = entities.boat
-  if active then
-    note = note or ((e.prev_note ~= -1) and e.prev_note) or notes_in_scale[e.walk_note_idx] or root_note
-    engine.boat_legato_freq(MusicUtil.note_num_to_freq(note))
-    engine.set_boat_legato(1, e.synth_idx, e.default_release)
-    e.legato_voice = true
-  elseif e.legato_voice then
-    engine.set_boat_legato(0, e.synth_idx, e.default_release)
-    e.legato_voice = false
-  end
-end
-
--- Recalcula si la voz de legato tiene que estar sonando (on/off,
--- legato, synth). restart=true la vuelve a crear (cambio de synth).
-function refresh_boat_voice(restart)
-  local e = entities.boat
-  local want = e.on and e.legato
-  if want and (restart or not e.legato_voice) then
-    boat_legato_voice(true)
-  elseif not want then
-    boat_legato_voice(false)
-  end
-end
 
 function trigger_entity_sound(entity, entity_name, note, release, amp_scale, spout_boost)
   amp_scale = amp_scale or 1.0
@@ -557,20 +396,12 @@ function trigger_entity_sound(entity, entity_name, note, release, amp_scale, spo
   local freq = MusicUtil.note_num_to_freq(note)
 
   if entity_name == "boat" then
-    if entity.legato then
-      if entity.legato_voice then
-        engine.boat_legato_freq(freq)
-      else
-        boat_legato_voice(true, note)
-      end
-    else
-      engine.boat_note(freq, 0.3 * amp_scale, entity.synth_idx, release)
-    end
+    engine.boat_note(freq, 0.3 * amp_scale, entity.synth_idx, release)
     entity.pulse = 1.0
     add_particle(entity.x_pos + 1, entity.y_pos - 12, (math.random() - 0.5) * 0.5, -0.6, 25, "note_spark")
     add_particle(entity.x_pos - 3, entity.y_pos - 4, (math.random() - 0.8) * 0.3, -0.4, 20, "smoke")
   elseif entity_name == "whale" then
-    engine.whale_note(freq * 0.5, 0.4 * amp_scale, entity.synth_idx, release)
+    engine.whale_note(freq * 0.5, 0.4 * amp_scale, release)
     -- spout_boost > 1 da una estela más alta (sube más rápido) y más
     -- sostenida (vive más tiempo, más partículas) — se usa en el
     -- canto/eco de K3, no en sus notas normales de arp/gen.
@@ -637,11 +468,7 @@ function process_gen_note(entity, entity_name, beats)
   if entity.gen_wait > 0 then return end
   entity.gen_wait = (4 / wave_steps(entity.max_steps)) * (0.6 + math.random())
 
-  if math.random() < GEN_SILENCE_CHANCE then
-    -- silencio: con legato, la voz sostenida también calla
-    if entity_name == "boat" then boat_legato_voice(false) end
-    return
-  end
+  if math.random() < GEN_SILENCE_CHANCE then return end
 
   local idx = next_harmonic_index(entity, 8)
   idx = util.clamp(idx + x_to_transpose(entity.x_pos), 1, #notes_in_scale)
@@ -690,11 +517,10 @@ function music_tick(beats)
   if splash_phase > 0 then return end
 
   current_tempo_mult = util.clamp(get_tempo_mult(), 0.1, 6)
-  local sp = speed_values[speed_idx]
-  local sea_beats = beats * sp
+  local sea_beats = beats
 
-  -- la fase del mar sigue al pulso real (y a la marea aleatoria)
-  clock_counter = clock_counter + beats * SEA_PHASE_PER_BEAT * sp * tide_rate
+  -- la fase del mar sigue al pulso real
+  clock_counter = clock_counter + beats * SEA_PHASE_PER_BEAT
 
   -- Tucker: la ola decide la nota (arp) o el paseo armónico (gen)
   local boat_x = entities.boat.x_pos
@@ -737,18 +563,7 @@ function update_physics()
   splash_update()
   if splash_phase > 0 then return end
 
-  if random_tide then
-    tide_target_timer = tide_target_timer - 1
-    if tide_target_timer <= 0 then
-      tide_rate_target = 0.3 + math.random() * 1.7
-      tide_target_timer = math.random(20, 60)
-    end
-  else
-    tide_rate_target = 1.0
-  end
-  tide_rate = tide_rate + (tide_rate_target - tide_rate) * 0.05
-
-  parallax_offset = (parallax_offset + 0.08 * wind_speed * tide_rate) % 128
+  parallax_offset = (parallax_offset + 0.08 * wind_speed) % 128
 
   update_particles()
 
@@ -756,7 +571,7 @@ function update_physics()
     entities.boat.pulse = math.max(0, entities.boat.pulse - 0.08)
   end
 
-  wing_phase = wing_phase + 0.5 * current_tempo_mult * tide_rate
+  wing_phase = wing_phase + 0.5 * current_tempo_mult
   entities.whale.swim_phase = entities.whale.swim_phase + 0.12 * current_tempo_mult
 
   -- Animación del panel (K1)
@@ -1094,7 +909,7 @@ local function draw_sea()
 
   -- pececitos que cruzan de vez en cuando
   for _, f in ipairs(fishes) do
-    f.x = f.x + f.speed * f.dir * math.max(0.3, tide_rate)
+    f.x = f.x + f.speed * f.dir
     if f.x < -8 or f.x > 136 then reset_fish(f) end
     local fx = floor(f.x)
     local fy = floor(f.y + sin(cc * 2 + f.x * 0.1) * 0.8)
@@ -1180,18 +995,14 @@ local function draw_lea(ax, ay)
   screen.stroke()
 end
 
--- Reencuadre: si este personaje es el elegido y el panel está
--- abriéndose/abierto, su X se desliza hacia el centro del área
--- izquierda (26/28) — es el mismo sprite, se mueve.
-local function reframe_x(true_x, char_key, target_x)
-  if (zoom_held or menu_slide > 0) and char_order[selected_char_idx] == char_key then
+-- Reencuadre: con el panel abierto, si el ítem elegido es "tucker" o
+-- "mobba", ese personaje se desliza hacia el área libre de la izquierda
+-- (26/28) para que se vea a quién se está ajustando.
+local function reframe_x(true_x, item_id, target_x)
+  if menu_slide > 0 and panel_items[selected_item_idx].id == item_id then
     return true_x + (target_x - true_x) * menu_slide
   end
   return true_x
-end
-
-local function char_hidden(char_key)
-  return (zoom_held or menu_slide > 0) and char_order[selected_char_idx] ~= char_key
 end
 
 function draw_mar_page()
@@ -1199,8 +1010,8 @@ function draw_mar_page()
   draw_sky()
   draw_sea()
 
-  if entities.boat.on and not char_hidden("boat") then
-    local bx = math.floor(reframe_x(entities.boat.x_pos, "boat", 26))
+  if entities.boat.on then
+    local bx = math.floor(reframe_x(entities.boat.x_pos, "tucker", 26))
     local waterline = sea_surface_y(bx)
     local y_next = sea_surface_y(bx + 2)
     local y_prev = sea_surface_y(bx - 2)
@@ -1208,8 +1019,8 @@ function draw_mar_page()
     draw_boat_sprite(bx, waterline, slope_angle)
   end
 
-  if entities.whale.on and not char_hidden("whale") then
-    local wx = math.floor(reframe_x(entities.whale.x_pos, "whale", 28))
+  if entities.whale.on then
+    local wx = math.floor(reframe_x(entities.whale.x_pos, "mobba", 28))
     draw_whale_sprite(wx, math.floor(entities.whale.y_pos))
   end
 
@@ -1311,59 +1122,13 @@ local function draw_item_menu(x, labels, values, selected_idx, y_start, row_h, v
 end
 
 -- ============================================================
--- DIBUJO: PÁGINAS DE PERSONAJE
+-- PANEL (K1 mantenido): una sola lista de 6 ajustes
 -- ============================================================
--- ============================================================
--- SEAN: construcción dinámica de ítems (con submenús contextuales)
--- ============================================================
-function build_sean_items()
-  local items = {}
-  table.insert(items, {kind = "tempo", label = "tempo"})
-  table.insert(items, {kind = "sync", label = "sync"})
-  table.insert(items, {kind = "speed", label = "speed"})
-  table.insert(items, {kind = "filter", label = "filter"})
-  table.insert(items, {kind = "random_tide", label = "random"})
-  table.insert(items, {kind = "root", label = "root"})
-  table.insert(items, {kind = "scale", label = "escala"})
-  table.insert(items, {kind = "fx_type", label = "fx"})
-  if fx_idx == 2 then
-    table.insert(items, {kind = "crush_bits", label = " bits"})
-    table.insert(items, {kind = "crush_rate", label = " rate"})
-  end
-  table.insert(items, {kind = "out_mode", label = "out mode"})
-  if out_mode_idx ~= 1 then
-    table.insert(items, {kind = "out_amount", label = " amount"})
-  end
-  return items
-end
-
-function sean_item_value(kind)
-  if kind == "tempo" then
-    return string.format("%d", math.floor(clock.get_tempo() + 0.5))
-  elseif kind == "sync" then
-    return params:string("clock_source")
-  elseif kind == "speed" then
-    return speed_options[speed_idx]
-  elseif kind == "filter" then
+local function panel_item_value(id)
+  if id == "sea_filter" then
     return string.format("%dHz", math.floor(filter_cutoff))
-  elseif kind == "random_tide" then
-    return random_tide and "ON" or "OFF"
-  elseif kind == "root" then
-    return root_note_names[root_pc + 1]
-  elseif kind == "scale" then
-    return scale_names[current_scale]
-  elseif kind == "fx_type" then
-    return fx_options[fx_idx]
-  elseif kind == "crush_bits" then
-    return tostring(crush_bits)
-  elseif kind == "crush_rate" then
-    return tostring(crush_rate_level)
-  elseif kind == "out_mode" then
-    return out_mode_options[out_mode_idx]
-  elseif kind == "out_amount" then
-    return string.format("%.2f", fx_amount)
   end
-  return ""
+  return params:string(id)
 end
 
 -- helpers: opciones que dan la vuelta / interruptores
@@ -1374,46 +1139,28 @@ local function param_toggle(id)
   params:set(id, (params:get(id) == 2) and 1 or 2)
 end
 
-function apply_sean_item_delta(kind, delta)
-  if kind == "tempo" then
-    -- el tempo solo se puede mover con el reloj interno (o link);
-    -- con midi/crow manda el aparato externo
-    local src = params:get("clock_source")
-    if src == 1 or src == 3 then
-      params:set("clock_tempo", util.clamp(clock.get_tempo() + delta, 20, 300))
+local function apply_panel_delta(id, delta)
+  if id == "tucker" then
+    param_wrap("tucker", delta, #entities.boat.synth_names + 1)
+    -- una nota de muestra para escuchar el timbre nuevo
+    local boat = entities.boat
+    if boat.on then
+      local preview_note = (boat.prev_note ~= -1) and boat.prev_note or root_note
+      trigger_entity_sound(boat, "boat", preview_note, boat.default_release)
     end
-  elseif kind == "sync" then
-    param_wrap("clock_source", delta, 4)
-  elseif kind == "speed" then
-    params:set("sea_speed", util.clamp(speed_idx + delta, 1, #speed_options))
-  elseif kind == "filter" then
-    params:set("sea_filter", util.clamp(filter_cutoff + delta * 100, 100, 5000))
-  elseif kind == "random_tide" then
-    param_toggle("sea_random")
-  elseif kind == "root" then
-    param_wrap("sea_root", delta, 12)
-  elseif kind == "scale" then
+  elseif id == "mobba" or id == "modo" then
+    param_toggle(id)
+  elseif id == "sea_scale" then
     params:set("sea_scale", util.clamp(current_scale + delta, 1, #scale_names))
-  elseif kind == "fx_type" then
-    param_wrap("sea_fx", delta, #fx_options)
-  elseif kind == "crush_bits" then
-    params:delta("sea_bits", delta)
-  elseif kind == "crush_rate" then
-    params:delta("sea_rate", delta)
-  elseif kind == "out_mode" then
-    param_wrap("sea_out", delta, #out_mode_options)
-  elseif kind == "out_amount" then
-    params:set("sea_amount", util.clamp(fx_amount + delta * 0.05, 0, 1))
+  elseif id == "sea_root" then
+    param_wrap("sea_root", delta, 12)
+  elseif id == "sea_filter" then
+    params:set("sea_filter", util.clamp(filter_cutoff + delta * 100, 100, 5000))
   end
 end
 
--- ============================================================
--- PANEL DE CONFIGURACIÓN (K1 mantenido, sobre el personaje elegido)
--- ============================================================
 function draw_zoom_overlay()
-  local char_name = char_order[selected_char_idx]
-  -- slide_x va de 128 (afuera de pantalla, a la derecha) a 54 (su
-  -- posición de reposo, igual a como se veían antes las páginas)
+  -- slide_x va de 128 (afuera de pantalla, a la derecha) a 54 (reposo)
   local slide_x = math.floor(128 - menu_slide * 74)
 
   screen.level(0)
@@ -1426,7 +1173,7 @@ function draw_zoom_overlay()
 
   screen.level(15)
   screen.move(26, 8)
-  screen.text_center(char_labels[char_name])
+  screen.text_center("UMI")
   -- olita debajo del nombre
   screen.level(4)
   for xx = -11, 11 do
@@ -1434,48 +1181,12 @@ function draw_zoom_overlay()
   end
   screen.fill()
 
-  -- Tres puntitos (más grandes) arriba del menú, del lado derecho, que
-  -- indican cuál de los 3 se está mostrando — el elegido, más brillante.
-  local dot_x = {slide_x + 14, slide_x + 34, slide_x + 54}
-  for i = 1, 3 do
-    screen.level(i == selected_char_idx and 15 or 3)
-    screen.rect(dot_x[i], 2, 2, 2)
-    screen.fill()
+  local labels, values = {}, {}
+  for i, spec in ipairs(panel_items) do
+    labels[i] = spec.label
+    values[i] = panel_item_value(spec.id)
   end
-
-  -- Cuarto indicador, para Lea: solo aparece (brillante) mientras su
-  -- solo está funcionando; si no, no se dibuja nada ahí.
-  if lea_solo.active then
-    screen.level(15)
-    screen.rect(dot_x[2], 8, 2, 2)
-    screen.fill()
-  end
-
-  -- La figura (Tucker/Mobba) ya se dibuja reencuadrada dentro de
-  -- draw_mar_page — acá no se redibuja. Para Sean tampoco hace falta
-  -- nada extra: el mar de fondo, que ya está siempre a la vista, es su
-  -- representación.
-
-  local items, labels, values = {}, {}, {}
-  if char_name == "sean" then
-    items = build_sean_items()
-    for i, spec in ipairs(items) do
-      labels[i] = spec.label
-      values[i] = sean_item_value(spec.kind)
-    end
-  else
-    local entity = entities[char_name]
-    items = build_entity_items(char_name)
-    for i, spec in ipairs(items) do
-      labels[i] = spec.label
-      values[i] = entity_item_value(entity, spec.kind)
-    end
-  end
-
-  if selected_item_idx > #items then selected_item_idx = #items end
-  local y_start = (char_name == "sean") and 12 or 20
-  local row_h = (char_name == "sean") and 9 or 11
-  draw_item_menu(slide_x, labels, values, selected_item_idx, y_start, row_h, 5)
+  draw_item_menu(slide_x, labels, values, selected_item_idx, 12, 9, #panel_items)
 end
 
 -- ============================================================
@@ -1505,37 +1216,8 @@ end
 -- ============================================================
 -- ENCODERS Y BOTONES
 -- ============================================================
-local param_prefix = {boat = "tucker_", whale = "mobba_"}
-
-function apply_item_delta(entity, entity_name, kind, delta)
-  local p = param_prefix[entity_name]
-  if kind == "on_off" then
-    param_toggle(p .. "on")
-  elseif kind == "mode" then
-    param_toggle(p .. "mode")
-  elseif kind == "synth" then
-    param_wrap(p .. "synth", delta, #entity.synth_names)
-    -- sin legato: una nota de muestra para escuchar el timbre nuevo
-    if entity.on and not entity.legato then
-      local preview_note = (entity.prev_note ~= -1) and entity.prev_note or root_note
-      trigger_entity_sound(entity, entity_name, preview_note, entity.default_release)
-    end
-  elseif kind == "tail" then
-    params:set(p .. "tail", util.clamp(entity.default_release + delta * 0.05, 0.02, 3.0))
-  elseif kind == "legato" and entity_name == "boat" then
-    param_toggle("tucker_legato")
-  end
-end
-
 function enc(n, delta)
   if splash_phase > 0 then splash_skip() return end
-
-  if n == 1 and zoom_held then
-    -- E1, con el panel abierto, elige personaje
-    selected_char_idx = ((selected_char_idx - 1 + delta) % #char_order) + 1
-    selected_item_idx = 1
-    return
-  end
 
   if n == 2 and lea_solo.active then
     -- El solo de Lea tiene prioridad sobre la navegación del panel
@@ -1544,29 +1226,12 @@ function enc(n, delta)
     return
   end
 
-  if zoom_held then
-    -- Panel abierto: E2 navega ítems, E3 los modifica
-    local char_name = char_order[selected_char_idx]
-    local items
-    if char_name == "sean" then
-      items = build_sean_items()
-    else
-      items = build_entity_items(char_name)
-    end
-
+  if zoom_held and n ~= 1 then
+    -- Panel abierto: E2 elige el ajuste, E3 lo cambia (E1 sigue siendo viento)
     if n == 2 then
-      selected_item_idx = ((selected_item_idx - 1 + delta) % #items) + 1
-    elseif n == 3 then
-      local spec = items[selected_item_idx]
-      if char_name == "sean" then
-        apply_sean_item_delta(spec.kind, delta)
-        local new_items = build_sean_items()
-        if selected_item_idx > #new_items then selected_item_idx = #new_items end
-      else
-        apply_item_delta(entities[char_name], char_name, spec.kind, delta)
-        local new_items = build_entity_items(char_name)
-        if selected_item_idx > #new_items then selected_item_idx = #new_items end
-      end
+      selected_item_idx = ((selected_item_idx - 1 + delta) % #panel_items) + 1
+    else
+      apply_panel_delta(panel_items[selected_item_idx].id, delta)
     end
     return
   end
@@ -1593,7 +1258,7 @@ function key(n, z)
   -- tragar el "soltar" de la tecla que salteó la intro
   if z == 0 and splash_held[n] then splash_held[n] = nil return end
   if n == 1 then
-    -- K1 mantenido abre/cierra el panel de quien esté elegido con E1
+    -- K1 mantenido abre el panel; al soltar se cierra
     zoom_held = (z == 1)
   elseif n == 2 then
     if z == 1 then

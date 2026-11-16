@@ -11,8 +11,7 @@
 - **Tucker** 是帆船，在海面上航行：他身下浪的高度就是他的音
 - **Mobba** 是鲸鱼，在水下游着自己更慢的旋律线，按 K3 她会唱歌并带回声
 - **Lea** 是鸟，只在按住 K2 时出现：一段滑翔般的连奏独奏
-- **Sean** 就是大海本身：速度、音阶、主音、滤波器、随机潮汐、比特粉碎和
-  磁带输出
+- **Sean** 就是大海本身：音阶、主音，以及所有声部共用的一个滤波器
 - 每个声部演奏跟随海浪的**琶音**，或在音阶中**生成式**漫步；把角色向两侧
   移动就会移调
 - 浪的大小决定步数：风平浪静 = 2 个音，大浪 = 16 个音
@@ -54,7 +53,7 @@
 | E3 | 左右移动 Mobba（同上，对她生效） |
 | 按住 K2 | Lea 飞进来演奏独奏；E2 移动她；松开后她慢慢飞走 |
 | K3 | Mobba 在她附近的音高上唱一个音，半秒后大海把它作为低五度的回声送回来 |
-| 按住 K1 | 打开所选角色的面板（见下文） |
+| 按住 K1 | 打开面板（见下文） |
 
 ![大浪](docs/2_waves.png)
 
@@ -64,34 +63,30 @@
 
 ### 面板（按住 K1）
 
-按住 K1 时，画面会拉近到一个角色，并滑出一个面板。
+按住 K1 时会滑入唯一的一个面板：一份包含六项设置的列表。
 
-| 控制 | 作用 |
+| 控制 | 动作 |
 |---|---|
-| E1 | 选择角色：Tucker、Mobba、Sean |
-| E2 | 选择项目 |
+| E2 | 选择设置 |
 | E3 | 修改它 |
 
-![Tucker](docs/5_tucker.png)
+面板打开时 E1 仍然控制风。
 
-**Tucker** — on/off · 模式（arp / gen）· 合成器（LFSaw、FM Bell、LFGauss、
-Dream）· tail（音符长度，仅 arp 模式）· legato。
+| 设置 | 取值 |
+|---|---|
+| tucker | off / Dream / Bell / Gauss（他的音色） |
+| mobba | off / on |
+| modo | arp / gen，两者共用 |
+| escala | 大调、各种小调、调式、五声音阶、全音音阶、布鲁斯、吉普赛小调 |
+| root | C … B |
+| filter | 100–5000 Hz |
 
-![Mobba](docs/6_mobba.png)
-
-**Mobba** — on/off · 模式（arp / gen）· 合成器（Pulse、Saw、SinOsc）· tail。
-
-![Sean](docs/7_sean.png)
-
-**Sean** — tempo · sync（时钟源）· speed（×1/4 … ×4）· filter ·
-random（会自己忽快忽慢的潮汐）· root · 音阶（大调、各种小调、调式、五声音阶、
-全音音阶、布鲁斯、吉普赛小调）· fx（无 / 比特粉碎，含 bits 和 rate）·
-out mode（normal / tape，含 amount）。
+速度和时钟源使用 norns 自身的设置（PARAMETERS > CLOCK）。
 
 ### 保存
 
-面板里的一切也都在 PARAMETERS > MAR 中，因此可以映射到 MIDI 并存入 PSET。
-退出脚本时，当前状态会保存到 `~/dust/data/umi/mar_estado.pset`，下次自动恢复。
+这六项设置也在 PARAMETERS > UMI 中，因此可以映射到 MIDI 并保存为 PSET。
+退出脚本时当前状态会写入 `~/dust/data/umi/umi_estado.pset`，下次自动恢复。
 
 <!-- u-ma:more -->
 **更多 U-MA 作品：** 所有乐器和工具汇集一处 → [U-MA 作品集](https://github.com/buenosairesfront/U-ma/blob/main/README.zh.md)
