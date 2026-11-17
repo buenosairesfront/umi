@@ -53,7 +53,7 @@ Cualquier tecla o encoder saltea la intro.
 
 | control | acción |
 |---|---|
-| E1 | viento: de mar en calma a olas grandes (también fija cuántos pasos toca cada voz) |
+| E1 | viento: de mar en calma a olas grandes (no cambia la velocidad de las notas: esa la da el reloj) |
 | E2 | mueve a Tucker a izquierda / derecha (transpone su línea −8…+8 grados de la escala) |
 | E3 | mueve a Mobba a izquierda / derecha (lo mismo, para ella) |
 | K2 mantenido | Lea entra volando y toca un solo; E2 la mueve; al soltar se va despacio |

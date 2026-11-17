@@ -56,7 +56,7 @@ Jede Taste und jeder Encoder überspringt das Intro.
 
 | Bedienelement | Funktion |
 |---|---|
-| E1 | Wind: von glatter See bis zu hohen Wellen (legt auch fest, wie viele Schritte jede Stimme spielt) |
+| E1 | Wind: von glatter See bis zu hohen Wellen (ändert nicht das Tempo der Noten: das gibt die Clock vor) |
 | E2 | Tucker nach links / rechts (transponiert seine Linie um −8…+8 Skalenstufen) |
 | E3 | Mobba nach links / rechts (dasselbe für sie) |
 | K2 halten | Lea fliegt herein und spielt ein Solo; E2 bewegt sie; beim Loslassen fliegt sie langsam davon |

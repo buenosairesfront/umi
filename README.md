@@ -51,7 +51,7 @@ Any key or encoder skips the intro.
 
 | control | action |
 |---|---|
-| E1 | wind: from flat calm to big waves (also sets how many steps each voice plays) |
+| E1 | wind: from flat calm to big waves (does not change the note speed: the clock sets that) |
 | E2 | move Tucker left / right (transposes his line −8…+8 scale steps) |
 | E3 | move Mobba left / right (same, for her) |
 | K2 held | Lea flies in and plays a solo; E2 moves her; let go and she leaves slowly |

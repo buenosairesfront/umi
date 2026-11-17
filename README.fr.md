@@ -54,7 +54,7 @@ N'importe quelle touche ou encodeur passe l'intro.
 
 | commande | action |
 |---|---|
-| E1 | vent : du calme plat aux grosses vagues (fixe aussi le nombre de pas de chaque voix) |
+| E1 | vent : du calme plat aux grosses vagues (ne change pas la vitesse des notes : c'est l'horloge qui la donne) |
 | E2 | déplace Tucker à gauche / à droite (transpose sa ligne de −8 à +8 degrés) |
 | E3 | déplace Mobba à gauche / à droite (pareil, pour elle) |
 | K2 maintenu | Lea arrive en volant et joue un solo ; E2 la déplace ; au relâchement elle repart lentement |

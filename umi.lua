@@ -1,11 +1,11 @@
--- umi v8.0 (antes Mar Sintetizador) — versión simple
+-- umi v8.1 (antes Mar Sintetizador) — versión simple
 -- Personajes: Tucker (barco), Mobba (ballena), Lea (ave, solo por K2), Sean (el mar)
 --
 -- Al arrancar: la intro U-MA de partículas y después la pantalla "UMI";
 -- luego arranca el instrumento. Cualquier tecla o encoder las saltea.
 --
--- E1: Viento (también la cantidad de pasos del arpegio/generativo:
---     mar calmo = 2, olas grandes = 16)
+-- E1: Viento (altura de las olas y sonido del viento; no cambia la
+--     velocidad de las notas: esa la da el reloj)
 -- E2: Mueve a Tucker en X (transpone -8..+8 pasos de escala) — o mueve
 --     a Lea mientras su solo está activo
 -- E3: Mueve a Mobba en X (mismo efecto de transposición)
@@ -17,7 +17,10 @@
 -- K3: Mobba canta una nota; un instante después vuelve como eco, una
 --     quinta más grave y apagada.
 --
--- Tempo y sincronización: los del sistema (PARAMETERS > CLOCK).
+-- Tempo y sincronización: los del sistema (PARAMETERS > CLOCK). Con
+-- source = midi, la velocidad la da el reloj MIDI que entra: el arpegio
+-- cae en la grilla (Tucker en semicorcheas, Mobba en corcheas) y la ola
+-- dura 8 pulsos justos. Ola que sube = notas ascendentes; baja = descendentes.
 -- Los 6 ajustes del panel son parámetros (PARAMETERS > UMI): se pueden
 -- mapear a MIDI, guardar en PSET, y el último estado se recuerda solo.
 -- La versión completa anterior quedó en umi_v7.6_respaldo.lua.
@@ -97,8 +100,9 @@ local current_tempo_mult = 1.0
 -- ============================================================
 -- TEMPO: reloj global de norns (PARAMETERS > CLOCK)
 -- ============================================================
--- A 120 bpm el mar avanza 0.75 de fase por pulso.
-local SEA_PHASE_PER_BEAT = 0.75
+-- Una ola completa dura 8 pulsos justos (2 compases de 4/4), así el
+-- dibujo y el arpegio quedan enganchados al reloj (interno o MIDI).
+local SEA_PHASE_PER_BEAT = (2 * math.pi) / 8
 
 function get_tempo_mult()
   return clock.get_tempo() / 120
@@ -149,16 +153,6 @@ local panel_items = {
   {id = "sea_root", label = "root"},
   {id = "sea_filter", label = "filter"},
 }
-
--- Cantidad de pasos del arpegio/generativo, derivada del oleaje actual
--- (E1, vía wind_speed): mar calmo = 2 notas, olas grandes = hasta 16,
--- acotado al tope propio de cada personaje (Mobba nunca pasa de 8).
-local WIND_SPEED_MIN, WIND_SPEED_MAX = 0.5, 3.0
-local function wave_steps(max_steps)
-  local norm = util.clamp((wind_speed - WIND_SPEED_MIN) / (WIND_SPEED_MAX - WIND_SPEED_MIN), 0, 1)
-  local steps = math.floor(2 + norm * 14 + 0.5)
-  return util.clamp(steps, 2, max_steps)
-end
 
 local wing_phase = 0
 
@@ -245,6 +239,7 @@ end
 -- ============================================================
 local STATE_FILE = nil -- se arma en init (carpeta data del script)
 local music_clock_id = nil
+local arp_clock_id = nil
 
 local function add_mar_params()
   params:add_group("UMI", 6)
@@ -299,6 +294,19 @@ local function start_music_clock()
   end)
 end
 
+-- Reloj del arpegio: despierta justo en cada semicorchea del reloj de
+-- norns (interno, MIDI, Link...). Tucker toca en todas; Mobba, una por
+-- medio (corcheas). Si el transporte MIDI se detiene, se detiene.
+local function start_arp_clock()
+  arp_clock_id = clock.run(function()
+    while true do
+      clock.sync(1 / 4)
+      local sixteenth = math.floor(clock.get_beats() * 4 + 0.5)
+      arp_tick(sixteenth % 2 == 0)
+    end
+  end)
+end
+
 -- ============================================================
 -- INICIALIZACIÓN
 -- ============================================================
@@ -333,6 +341,7 @@ function init()
   redraw_metro:start()
 
   start_music_clock()
+  start_arp_clock()
 
   engine.set_wind(0.012, 350)
 end
@@ -340,6 +349,7 @@ end
 -- Al salir del script: se guarda el estado de los parámetros
 function cleanup()
   if music_clock_id then clock.cancel(music_clock_id) end
+  if arp_clock_id then clock.cancel(arp_clock_id) end
   if STATE_FILE then
     util.make_dir(norns.state.data)
     params:write(STATE_FILE)
@@ -424,8 +434,9 @@ end
 -- ============================================================
 -- Tucker: la posición X (controlada por E2 en la página Mar) transpone
 -- el arpegio -8..+8 pasos de escala, sumado al índice que ya sale de la
--- altura de la ola. La ola sigue dando la forma ascendente/descendente;
--- la mano en el encoder decide en qué registro suena esa forma.
+-- altura de la ola. La ola da la forma: mientras sube en pantalla las
+-- notas suben, mientras baja, bajan; la mano en el encoder decide en qué
+-- registro suena esa forma. norm_y: 0 = valle, 1 = cresta.
 local BOAT_X_MIN, BOAT_X_MAX = 16, 112
 local function x_to_transpose(x)
   local norm = util.clamp((x - BOAT_X_MIN) / (BOAT_X_MAX - BOAT_X_MIN), 0, 1)
@@ -433,7 +444,7 @@ local function x_to_transpose(x)
 end
 
 function process_arp_note(entity, entity_name, norm_y)
-  local total_steps = wave_steps(entity.max_steps)
+  local total_steps = entity.max_steps
   local step = math.floor(norm_y * math.max(0, total_steps - 1))
 
   if step ~= entity.prev_step then
@@ -460,17 +471,27 @@ end
 local GEN_SILENCE_CHANCE = 0.25
 local GEN_MIN_DUR, GEN_MAX_DUR = 0.08, 1.2
 
--- beats: pulsos transcurridos desde el último tick (ya multiplicados por
--- speed). Intervalo base = 4/pasos pulsos (a 16 pasos, una semicorchea),
--- con la misma variación aleatoria 0.6x-1.6x de antes.
-function process_gen_note(entity, entity_name, beats)
+-- beats: pulsos transcurridos desde el último tick. Intervalo base =
+-- 4/pasos pulsos (Tucker 16 pasos: una semicorchea; Mobba 8: una
+-- corchea), con la misma variación aleatoria 0.6x-1.6x de antes.
+-- La nota sale de la altura de la ola (norm_y: 0 = valle, 1 = cresta),
+-- igual que en arp: ola que sube = notas que suben. Lo generativo queda
+-- en el ritmo irregular, los silencios y las duraciones. Se mueve en la
+-- franja central de la escala (8 pasos de margen por punta) para que el
+-- transpose de E2/E3 nunca tenga que recortarse.
+local GEN_HEADROOM = 8
+function process_gen_note(entity, entity_name, beats, norm_y)
   entity.gen_wait = entity.gen_wait - beats
   if entity.gen_wait > 0 then return end
-  entity.gen_wait = (4 / wave_steps(entity.max_steps)) * (0.6 + math.random())
+  entity.gen_wait = (4 / entity.max_steps) * (0.6 + math.random())
 
   if math.random() < GEN_SILENCE_CHANCE then return end
 
-  local idx = next_harmonic_index(entity, 8)
+  local min_idx = 1 + GEN_HEADROOM
+  local max_idx = math.max(min_idx, #notes_in_scale - GEN_HEADROOM)
+  local idx = min_idx + math.floor(norm_y * (max_idx - min_idx) + 0.5)
+  if idx == entity.walk_note_idx then return end -- la ola no cambió de escalón
+  entity.walk_note_idx = idx
   idx = util.clamp(idx + x_to_transpose(entity.x_pos), 1, #notes_in_scale)
   entity.last_idx = idx
   local note = notes_in_scale[idx]
@@ -478,14 +499,12 @@ function process_gen_note(entity, entity_name, beats)
   trigger_entity_sound(entity, entity_name, note, dur)
 end
 
-function process_entity_note(entity_name, norm_y, beats)
+-- El modo gen avanza con el reloj musical; el arp, con arp_tick.
+function process_entity_note(entity_name, beats, norm_y)
   local entity = entities[entity_name]
   if not entity.on then return end
-
-  if entity.mode == "arp" then
-    process_arp_note(entity, entity_name, norm_y)
-  else
-    process_gen_note(entity, entity_name, beats)
+  if entity.mode ~= "arp" then
+    process_gen_note(entity, entity_name, beats, norm_y)
   end
 end
 
@@ -522,15 +541,16 @@ function music_tick(beats)
   -- la fase del mar sigue al pulso real
   clock_counter = clock_counter + beats * SEA_PHASE_PER_BEAT
 
-  -- Tucker: la ola decide la nota (arp) o el paseo armónico (gen)
+  -- Tucker: sigue la ola; acá solo el modo gen (cresta = nota aguda:
+  -- en pantalla "arriba" es y menor, por eso la señal va invertida)
   local boat_x = entities.boat.x_pos
   entities.boat.y_pos = sea_surface_y(boat_x)
-  process_entity_note("boat", (sea_wave_signal(boat_x) + 1) / 2, sea_beats)
+  process_entity_note("boat", sea_beats, (1 - sea_wave_signal(boat_x)) / 2)
 
   -- Mobba
   local whale_sin = math.sin(clock_counter + entities.whale.phase)
   entities.whale.y_pos = 50 + whale_sin * 3.5
-  process_entity_note("whale", (whale_sin + 1) / 2, sea_beats)
+  process_entity_note("whale", sea_beats, (1 - whale_sin) / 2)
 
   -- Eco de Mobba (K3)
   if echo.pending and util.time() >= echo.at then
@@ -553,6 +573,26 @@ function music_tick(beats)
         add_particle(lea_solo.x, lea_solo.y_pos, -0.8, (math.random() - 0.5) * 0.2, 28, "spark")
       end
     end
+  end
+end
+
+-- ------------------------------------------------------------
+-- ARPEGIO: se llama en cada semicorchea del reloj (ver start_arp_clock).
+-- La altura en pantalla decide la nota: en pantalla "arriba" es y menor,
+-- por eso la señal va invertida (cresta = nota más aguda).
+-- ------------------------------------------------------------
+function arp_tick(on_eighth)
+  if splash_phase > 0 then return end
+
+  local boat = entities.boat
+  if boat.on and boat.mode == "arp" then
+    process_arp_note(boat, "boat", (1 - sea_wave_signal(boat.x_pos)) / 2)
+  end
+
+  local whale = entities.whale
+  if on_eighth and whale.on and whale.mode == "arp" then
+    local whale_sin = math.sin(clock_counter + whale.phase)
+    process_arp_note(whale, "whale", (1 - whale_sin) / 2)
   end
 end
 
